@@ -20,7 +20,9 @@
 ├── CLAUDE.md                      # 在本仓库里工作时的维护规则
 ├── docs/
 │   ├── workflow.md                # 8 阶段工作流全景（阶段0 环境底座 → 阶段8 沉淀）
-│   └── pain-log.md                # 痛点日志(pain log)：全库规则的唯一来源
+│   ├── pain-log.md                # 痛点日志(pain log)：全库规则的唯一来源
+│   └── research/                  # 归档调研报告：只读参考，不是规则
+│       └── system-map.md          # 业务→代码「活地图」：价值判断与分层落地方案
 ├── universal/
 │   └── principles.md              # 跨栈通用硬规则，常驻上下文，预算最紧
 ├── process/                       # 流程五件套，按阶段在任务中使用

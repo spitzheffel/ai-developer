@@ -38,6 +38,8 @@
 | stacks/*/README.md | 200 |
 | claude-code/hooks.md | 120 |
 
+例外：`docs/research/` 下为归档调研报告——只读不养，不受行数预算与质量门槛约束；其中建议要落地时，仍走痛点日志入口逐条过三连筛。
+
 ## 结构约束
 
 - 栈文档（stacks/*/README.md）必须与 [stacks/_template.md](stacks/_template.md) 七节逐节一致，节名与顺序一字不差：`## 1. 选型清单` / `## 2. 工具链与命令` / `## 3. 目录规范` / `## 4. build-vs-buy 默认值` / `## 5. 参照模式` / `## 6. 高频 AI 坑` / `## 7. 配置文件索引`。
