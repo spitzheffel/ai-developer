@@ -1,0 +1,20 @@
+# golangci-lint v2 配置。复制到 Go 项目根:golangci-lint run 检查,run --fix 同时修 lint 与格式。
+# 选型理由与命令见 ../README.md 第 2、7 节;改过本文件后跑一次 golangci-lint run 确认能加载。
+version: "2" # v2 必填字段,唯一合法值 "2"
+
+linters:
+  default: standard # 官方 standard 组:errcheck、govet、ineffassign、staticcheck、unused(gosimple/stylecheck 已并入 staticcheck)
+  enable: # 在 standard 之上追加
+    - gocritic # 可疑代码/性能/风格诊断,覆盖面最广的补充检查
+    - revive # 命名与注释检查:抓包名 stutter、导出符号缺注释(见 README 第 6 节)
+    - misspell # 注释与字符串里的英文拼写错误,可被 --fix 修复
+  settings:
+    govet:
+      enable-all: true # 开全 govet 分析器,含默认关闭的 shadow(抓 := 意外遮蔽 err)
+      disable:
+        - fieldalignment # 纯内存对齐建议,噪音大于收益,关闭
+
+formatters: # v2 起格式化器与 linter 分离;golangci-lint fmt 执行,run 对格式只报不改
+  enable:
+    - gofumpt # gofmt 的严格超集:更一致的空行与字面量写法
+    - goimports # 自动增删并分组 import

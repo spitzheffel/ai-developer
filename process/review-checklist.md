@@ -50,4 +50,4 @@ vibe coding 真正的陷阱不是代码写错,而是 diff 大到没人看。本�
 
 分步小 diff(习惯)→ 自审对照本清单 → 二遍 AI 审查 + 减法审查 → 人审聚焦测试与验收 → 通过后进入阶段6,见 [完成定义](definition-of-done.md) 第 4 节。
 
-审查中反复出现的新症状,记入 [痛点日志](../docs/pain-log.md)(pain log);重复两次以上,按 [三连筛](../universal/principles.md) 决定沉淀为配置/钩子、CLAUDE.md 还是规则(阶段8 沉淀)。
+审查中反复出现的新症状,记入 [痛点日志](../docs/pain-log.md)(pain log);重复两次以上,按 [三连筛](../CLAUDE.md) 决定沉淀为配置/钩子、CLAUDE.md 还是规则(阶段8 沉淀)。

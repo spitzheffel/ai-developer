@@ -1,0 +1,60 @@
+# Python 新项目基线：整份复制，改 name 与 dependencies 后执行 `uv sync`。
+# 各项取舍与禁用项见 ../README.md 第 1 节、第 7 节。
+
+[project]
+name = "example"            # 改成真实包名，与 src/<package> 目录名一致
+version = "0.1.0"
+# 只写下界不封上界：requires-python 同时约束可用语法与依赖解析范围
+requires-python = ">=3.12"
+dependencies = [
+    # 运行依赖示例：一律用 `uv add <pkg>` 维护，禁手改本列表或 uv.lock
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+# PEP 735 开发依赖组：`uv add --dev` 写入此处，`uv sync` 默认一并安装
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.14",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+# ruff 全包 lint + format：禁再叠加 black/isort/flake8
+line-length = 100
+target-version = "py312"    # 与 requires-python 下界保持一致
+
+[tool.ruff.lint]
+# 用 extend-select 在默认集之上追加（select 会整体替换默认集），跨 ruff 版本行为稳定
+extend-select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+# 行长由 ruff format 兜底，lint 不重复报 E501
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py 允许 re-export（F401）与非顶部 import（E402）
+"__init__.py" = ["E402", "F401"]
+
+[tool.ruff.format]
+# double 即默认值，显式写死防止风格漂移
+quote-style = "double"
+
+[tool.pytest.ini_options]
+# 用 ini_options 表以兼容 pytest<9；不与 pytest 9 的原生 [tool.pytest] 表并存
+minversion = "8.0"
+addopts = "-ra -q"          # -ra 汇总全部非通过项，-q 精简输出
+testpaths = ["tests"]
+asyncio_mode = "auto"       # pytest-asyncio：async 测试免写 @pytest.mark.asyncio
+
+[tool.mypy]
+# strict = true 等价 --strict（disallow_untyped_defs 等全套）；放宽在 overrides 按模块做
+python_version = "3.12"
+strict = true
+warn_unused_configs = true  # overrides 段匹配不到任何文件时报警，防配置失效
+
+[[tool.mypy.overrides]]
+# 占位示例：替换成真实的无类型存根库，或整段删除；禁全局 ignore_missing_imports
+module = ["somelibrary.*"]
+ignore_missing_imports = true

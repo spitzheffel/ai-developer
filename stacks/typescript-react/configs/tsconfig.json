@@ -1,0 +1,33 @@
+// TypeScript 严格基线（Vite + React）。tsconfig 是 JSONC，注释合法。
+// create-vite 官方模板是工程引用三件套（tsconfig.json 仅 references + app + node），
+// 本文件对应 app 侧基线：单 tsconfig 项目直接用，三件套项目并入 tsconfig.app.json。
+{
+  "compilerOptions": {
+    /* 目标与模块：Vite bundler 模式 */
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true, // 产物归 Vite，tsc 只做类型检查
+    "jsx": "react-jsx",
+    "types": ["vite/client"], // 上测试后追加 "vitest/globals" 与 "@testing-library/jest-dom"
+    "skipLibCheck": true,
+
+    /* 严格度 */
+    "strict": true, // TS 6 起默认 true，显式写以兼容 TS 5.x
+    "noUncheckedIndexedAccess": true, // 非 strict 家族、模板也不带，必须手动开：arr[i] 推导为 T | undefined
+    "noImplicitOverride": true, // 覆写父类成员必须写 override
+
+    /* 单文件转译约束：esbuild 逐文件编译的前提 */
+    "verbatimModuleSyntax": true, // 纯类型导入必须 import type；isolatedModules 的约束由它承担，不再单写
+    "erasableSyntaxOnly": true, // 禁 enum、namespace 等不可擦除语法
+
+    /* 卫生项 */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
