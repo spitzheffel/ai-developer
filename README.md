@@ -23,7 +23,8 @@
 │   ├── pain-log.md                # 痛点日志(pain log)：全库规则的唯一来源
 │   └── research/                  # 归档调研报告：只读参考，不是规则
 │       ├── ecosystem.md           # 生态调研：三个点名项目剖析、职位增量规范、多 agent 协作
-│       └── system-map.md          # 业务→代码「活地图」：价值判断与分层落地方案
+│       ├── system-map.md          # 业务→代码「活地图」：价值判断与分层落地方案
+│       └── adoption-plan.md       # 两报告行动项的合并落地方案（W0-W8，待拍板）
 ├── universal/
 │   └── principles.md              # 跨栈通用硬规则，常驻上下文，预算最紧
 ├── process/                       # 流程五件套，按阶段在任务中使用
