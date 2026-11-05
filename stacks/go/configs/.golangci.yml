@@ -8,11 +8,25 @@ linters:
     - gocritic # 可疑代码/性能/风格诊断,覆盖面最广的补充检查
     - revive # 命名与注释检查:抓包名 stutter、导出符号缺注释(见 README 第 6 节)
     - misspell # 注释与字符串里的英文拼写错误,可被 --fix 修复
+    - depguard # 依赖边界:按 import 前缀禁跨域(README 第 1 节「依赖边界」),规则在下方 settings.depguard
   settings:
     govet:
       enable-all: true # 开全 govet 分析器,含默认关闭的 shadow(抓 := 意外遮蔽 err)
       disable:
         - fieldalignment # 纯内存对齐建议,噪音大于收益,关闭
+    depguard:
+      # 规则三重身份:给人看的架构文档 + 给 AI 读的边界输入 + CI 红灯。总数 ≤15 条,写不下说明边界该重划。
+      # 坑:启用了 depguard 却没写 rules 时,它默认只放行标准库——不用就从 enable 里拿掉,别把 rules 删空。
+      rules:
+        order-boundary: # 规则名会出现在报错里;一个业务域一条,照抄改名
+          list-mode: lax # 只拦 deny 命中的 import,其余放行
+          files:
+            - "**/internal/order/**" # 按绝对路径匹配,必须 **/ 开头;尾 ** 连子包与 _test.go 一起管(depguard 文档的 {**/,} 写法在 golangci-lint v2.15 实测不匹配)
+          deny: # pkg 是纯字符串前缀:尾 $ 只配该包本身,尾 / 只配其子包;两条合用才不误伤 internal/username
+            - pkg: example.com/app/internal/user$ # example.com/app 换成 go.mod 里的 module 路径
+              desc: 跨域 import;在 order 里定义所需最小接口,由 cmd/<app>/main.go 注入 user 的实现
+            - pkg: example.com/app/internal/user/
+              desc: 跨域 import;在 order 里定义所需最小接口,由 cmd/<app>/main.go 注入 user 的实现
 
 formatters: # v2 起格式化器与 linter 分离;golangci-lint fmt 执行,run 对格式只报不改
   enable:

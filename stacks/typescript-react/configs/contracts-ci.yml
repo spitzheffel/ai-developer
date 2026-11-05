@@ -1,0 +1,51 @@
+# 契约 CI 模板（TS/React 栈）：复制为项目的 .github/workflows/contracts.yml，标 <占位> 的行按项目改。
+# 启用条件：项目有对外 API，且 openapi.json 已提交进仓库（前后端同仓，或从后端同步一份进前端仓）。
+#   没有对外 API 的项目不启用本文件：类型生成与 oasdiff 一并跳过。
+# 两道门，各自出红绿：
+#   drift     用已提交的 openapi.json 重新生成接口类型，与已提交的产物逐字比对：改了 spec 没重跑生成、手改了产物 → 红
+#   breaking  oasdiff 对比 main 上的 spec，出现 ERR 级破坏性变更（删接口/字段、改类型、新增必填参数等）→ 红
+# 首个引入 spec 的 PR：main 上还没有 spec，breaking 读不到 base 会失败；先单独合入 spec，或该 PR 临时跳过这道门。
+name: contracts
+
+on:
+  pull_request:
+    branches: [main] # <占位> 默认分支名
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # 不写 version：读 package.json 的 packageManager 字段
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # <占位> 生成命令收进 package.json scripts，本地与 CI 同一条：
+      #   openapi-typescript 项目  "gen:api": "openapi-typescript openapi.json -o src/api/generated/schema.d.ts"
+      #   orval 项目               "gen:api": "orval"（产物目录以 orval.config 的 target 为准）
+      # 产物目录须在 .prettierignore 与 ESLint 的 globalIgnores 里排除（本栈基线已排除 src/api/generated；改目录三处同改），否则本地 format 过的产物逐字比对必误报。
+      - run: pnpm gen:api
+      - name: 生成物与 spec 一致性检查
+        run: |
+          git add --intent-to-add src/api/generated  # 新生成、未跟踪的文件也纳入比对；<占位> 产物目录
+          git diff --exit-code -- src/api/generated
+
+  breaking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: 取目标分支，供 base 的 git 引用读取
+        run: git fetch --depth=1 origin "$BASE_REF"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - uses: oasdiff/oasdiff-action/breaking@v0 # oasdiff 官方 action（Tufin/oasdiff-action 已废弃）
+        with:
+          base: origin/${{ github.base_ref }}:openapi.json # <占位> spec 路径：目标分支（main）上的版本
+          revision: HEAD:openapi.json # <占位> 同一路径：本 PR 的版本
+          fail-on: ERR
+          review: false # 不把 spec 上传 oasdiff.com 做并排评审；要评审页再改 true，并加 pull-requests: write

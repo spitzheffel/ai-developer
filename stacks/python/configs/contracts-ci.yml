@@ -1,0 +1,98 @@
+# 契约 CI 模板（python 栈）：DB schema 文档与 API 契约两道 drift 门禁——真源变了、工件没再生成，CI 就红。
+# 给开 Python 后端项目的人与 Claude Code 会话看；索引见 ../README.md 第 7 节，来源 docs/research/adoption-plan.md W7。
+#
+# 启用条件（两档制：模板现在入库，启用挂触发）：下一个真实 API 项目开工时，复制为 .github/workflows/contracts.yml。
+#   - 无对外 API 的项目：删掉 api-contract job（跳过 oasdiff/Spectral）；无数据库的项目：删掉 db-schema job。
+#
+# 一次性前置（本地做完、连同生成物一起提交，否则首跑必红）：
+#   1. pyproject 用本栈基线 configs/pyproject.toml：自带 [build-system]，uv sync 以 editable 装入本包；删掉该表则 import 不到 <package>。
+#   2. alembic 目录叫 migrations/；async 驱动（下方 asyncpg/aiosqlite）须用 async 模板 `alembic init -t async migrations`
+#      （同步模板必报 MissingGreenlet），依赖须含 sqlalchemy[asyncio]（2.1 起不再默认带 greenlet）；env.py 从环境变量
+#      DATABASE_URL 读连接串，target_metadata 指向模型 metadata（模板默认 None，alembic check 直接报错）。
+#   3. 仓库根放 .tbls.yml，ER 图落 Mermaid（SVG/PNG 的 diff 不可读）：
+#        dsn: ${TBLS_DSN}
+#        docPath: dbdoc
+#        er:
+#          format: mermaid
+#      env 有 TBLS_DSN 时 tbls 不自动读 .tbls.yml（退回默认 SVG），故 doc/diff 一律带 -c：
+#      本地 TBLS_DSN 指向升到 head 的库，`tbls doc -c .tbls.yml` 生成 dbdoc/ 并提交；
+#      此后 schema 每变一次就 `tbls doc -c .tbls.yml --rm-dist` 再提交。
+#   4. 用 api-contract job 里 dump 那条命令在本地生成 openapi.json 并提交；导入 app 不得连库或要求必填密钥。
+#   5. 仓库根放 .spectral.yaml，最小一行：extends: ["spectral:oas"]（Spectral 6 没有规则集就拒绝 lint）；
+#      建议再加 rules: {operation-description: error}——每个 operation 必有说明，agent 才调得对。
+#
+# 占位符：<package> = 根包名（同 pyproject 的 [project].name）；Postgres 镜像版本、DB 驱动、主分支名按项目改。
+
+name: contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  db-schema:
+    # 跑完迁移的真库 → alembic check（模型改了没出 migration 即红）→ tbls diff（库与已提交 dbdoc/ 不一致即红）
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18 # 与生产大版本一致
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app # CI 一次性库，不是真实凭证
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://app:app@localhost:5432/app # 驱动按项目（asyncpg / psycopg）
+      TBLS_DSN: postgres://app:app@localhost:5432/app?sslmode=disable
+      # SQLite 变体（迁移不含 Postgres 专有类型、或生产本就是 SQLite 时最省）：删掉上面 services 段，两行 env 换成
+      #   DATABASE_URL: sqlite+aiosqlite:///ci.db
+      #   TBLS_DSN: sqlite://${{ github.workspace }}/ci.db   # 展开为 sqlite:///home/runner/...，tbls 要绝对路径
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3 # setup-uv 只发布完整版本 tag，没有 @v10 这种浮动大版本
+      - run: uv sync --locked
+      - run: uv run alembic upgrade head # 先升到 head，alembic check 才有意义
+      - run: uv run alembic check # 模型改了却没生成 migration → 红
+      - uses: k1low/setup-tbls@v1
+      - name: tbls diff（红了就本地 tbls doc -c .tbls.yml --rm-dist 后提交 dbdoc/）
+        run: tbls diff -c .tbls.yml # 必须 -c：env 有 TBLS_DSN 时不自动读 .tbls.yml，会按默认 SVG 比对、恒红
+
+  api-contract:
+    # 导出 openapi.json → git diff 防漂移 → oasdiff 卡破坏性变更 → Spectral 管 spec 质量
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # oasdiff 按 git ref 读 base 分支的 spec，需要完整历史与远端分支
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv sync --locked
+      - name: 导出 openapi.json 并防漂移（本地再生成用同一条命令）
+        run: |
+          uv run python -c 'import json; from <package>.main import app; print(json.dumps(app.openapi(), indent=2, ensure_ascii=False))' > openapi.json
+          git ls-files --error-unmatch openapi.json > /dev/null # 从未提交过 → 红
+          git diff --exit-code openapi.json
+      - name: base 分支是否已有 openapi.json（首个引入它的 PR 没有，跳过 oasdiff）
+        id: base
+        if: github.event_name == 'pull_request'
+        run: |
+          if git cat-file -e "origin/${GITHUB_BASE_REF}:openapi.json" 2>/dev/null; then
+            echo "has_spec=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: oasdiff/oasdiff-action/breaking@v0
+        if: steps.base.outputs.has_spec == 'true'
+        with:
+          base: 'origin/${{ github.base_ref }}:openapi.json'
+          revision: 'HEAD:openapi.json'
+          fail-on: ERR
+          review: false # 默认 true：有变更时把两份 spec 加密上传 oasdiff.com；关掉则 spec 不出 CI
+      - name: Spectral lint（规则集见仓库根 .spectral.yaml）
+        run: npx --yes @stoplight/spectral-cli@6 lint openapi.json --fail-severity error

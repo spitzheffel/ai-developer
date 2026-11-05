@@ -1,11 +1,11 @@
+> 给 Claude Code 看的本项目操作手册，每次会话自动加载。动手改代码前以此为准。
+
 <!--
   CLAUDE.md 模板｜来自 AI 协作开发策略库（templates/CLAUDE.md.template）
   用法：复制到新项目根目录，改名 CLAUDE.md；按各节注释填空，填完删掉全部注释。
   硬约束：全文保持 150 行以内；每月修剪一次——删掉过时的行，新约定才有预算进来。
   原则：只写本项目特有、可判定对错的内容；这里每一行都消耗每次会话的上下文。
 -->
-
-> 给 Claude Code 看的本项目操作手册，每次会话自动加载。动手改代码前以此为准。
 
 # <项目名>
 
@@ -51,6 +51,10 @@
 | 通用组件 | `<src/components/ui/>` | <按钮、表单、弹窗等基础件> |
 | 工具函数 | `<src/utils/>` | <日期、金额、字符串处理> |
 
+<!-- 下两行指向 GLOSSARY.md、CONTEXT-MAP.md 两份模板（复制到项目根）；没建这两个文件就先删掉对应行。 -->
+- 命名前先查项目 `GLOSSARY.md`；新术语先 Reuse/Compose/Qualify，最后才造词。
+- 模块边界见 `CONTEXT-MAP.md` 与边界 linter 规则文件（`<.dependency-cruiser.cjs / pyproject.toml [tool.importlinter] / .golangci.yml depguard>`），确需越界：先提 ADR、经人审改规则文件，再改码；禁止为过 CI 自改规则。
+
 ## 4. 项目约定
 
 <!-- 只写两类：与社区默认不同的；曾被做错过的。每条尽量指一个参照文件（范例驱动），胜过长段描述。 -->
@@ -65,6 +69,10 @@ src/
 - 命名：<如 组件文件 PascalCase.tsx；hook 用 useXxx.ts；服务 xxxService.ts>
 - 错误处理：<如 service 只抛 AppError 子类，routes 统一捕获转响应；参照 `src/routes/users.ts`>
 - API 返回结构：成功 `<{ "code": 0, "data": {…} }>`；失败 `<{ "code": 1001, "message": "…" }>`；禁止偶尔裸返回 data
+<!-- 下三行是 spec 闭环：让文档随代码同 PR 刷新。ADR 规范见策略库 [adr](../process/adr.md)；没有有状态实体就删第三行。 -->
+- 改动触及旧决策时，必须引用或新增 `docs/adr/` 下的 ADR。
+- spec/文档闭环：改码引入新术语/新依赖方向/新状态/推翻旧决策，同一 PR 顺手更新 GLOSSARY / CONTEXT-MAP / ADR。
+- 有状态实体维护 `docs/state/<实体>.md`，内嵌 Mermaid `stateDiagram`；改状态逻辑必须同步改图；状态或转移多到图维护不动（守卫、并行态、定时转移）才引 XState。
 
 ## 5. 选型清单
 
@@ -91,6 +99,10 @@ src/
 3. 最小变更：只改任务简述界定范围内的文件；发现别的问题，报出来，不顺手改。
 4. 新建任何通用实现前，执行第 3 节的查表规则。
 5. 同一报错连续两次没修好：停下，汇报已试过什么，等指示，不做第三次尝试。
+<!-- 6-8：证据链便于评审先看锚点 diff；多 agent 两行先预埋，真开并行线再用；调试守则按项目日志方案填 request_id 字段名。 -->
+6. PR/提交描述带证据链：动了哪个 context、哪张表、哪个 operationId、状态机有无变化。
+7. 多 agent：共享契约（接口/类型/表结构）先冻结再 fan-out；评审者用只读新会话，只给 diff + 任务简述。
+8. 调试守则：先复现 → 按 `<request_id>` 过滤日志/看前端 console 取运行时证据 → 才改码 → 修完回查。
 
 ## 7. 完成定义
 

@@ -1,0 +1,30 @@
+> 本项目的上下文地图，给 Claude Code 与评审者看。跨目录改动、新增 import 前先查此表；模块边界以此表与边界 linter 规则文件为准。
+
+<!--
+  CONTEXT-MAP.md 模板｜来自 AI 协作开发策略库（templates/CONTEXT-MAP.md.template）
+  用法：复制到项目根目录，改名 CONTEXT-MAP.md；示例行替换成本项目的 bounded context，填完删掉全部注释。
+  约定：
+  - 顶层目录名 = bounded context 名 = 本表一行 = 边界 linter 的 group 名，四处用同一个名字。
+  - 多上下文时，每个上下文目录自带子 GLOSSARY.md（见 GLOSSARY.md.template）+ 子 CLAUDE.md；根 CLAUDE.md 保持精简。
+  - 依赖方向写「谁依赖谁」，且必须与边界 linter 规则文件一致：
+    TS=dependency-cruiser、Python=import-linter、Go=internal/ + depguard。
+  - 刷新：改码引入新依赖方向或新上下文时，同一 PR 更新本表，人审 diff。
+  - 不用 Context Mapper CML：单人项目学习曲线不划算，markdown 表 + 边界 linter 即等效。
+-->
+
+# 上下文地图
+
+| 上下文（目录） | 职责 | 对外接口 | 依赖方向 |
+| --- | --- | --- | --- |
+| `orders/` | 下单、订单状态流转 | operationId `createOrder` / `getOrder`；事件 `OrderPaid` | 依赖 `catalog/`；被 `billing/` 依赖 |
+| `catalog/` | 商品与库存的唯一出处 | operationId `listProducts`；函数 `reserveStock()` | 不依赖其他上下文 |
+| `billing/` | 支付、退款、对账 | 事件 `RefundIssued`；表 `payments` | 依赖 `orders/`（只读其事件） |
+
+<!-- 在此继续添加行；一个上下文一行，职责一句话说清，说不清就该拆分。 -->
+
+## 禁止的依赖
+
+<!-- 列出明确禁止的反向依赖，与边界 linter 规则一一对应。 -->
+
+- `catalog/` 禁止 import `orders/` 或 `billing/`。
+- 上下文之间只经「对外接口」列的东西交互，禁止直接读他人的表。

@@ -31,7 +31,7 @@ vibe coding 真正的陷阱不是代码写错,而是 diff 大到没人看。本�
 | 6 | 过度抽象 | 单一实现配接口;只被使用一次的工厂或包装层 |
 | 7 | 死代码与未使用导出 | 新增但没有调用方的函数、导出、参数、配置项 |
 | 8 | 风格不一致 | 命名、错误处理、文件组织与周边代码不同;以所在栈文档「## 5. 参照模式」为准 |
-| 9 | 状态四件套缺失 | 列表/详情缺 loading（同形 skeleton）/ error（可重试）/ empty（设计过）/ success 任一态 |
+| 9 | 状态四件套缺失 | 列表/详情缺 loading（同形 skeleton）/ error（可重试）/ empty（设计过）/ success 任一态（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md） |
 
 对照示例:
 
@@ -60,10 +60,10 @@ vibe coding 真正的陷阱不是代码写错,而是 diff 大到没人看。本�
 |---|---|---|
 | 一 | Claude Code 自审 | 提交审查前对照第 0–3 节逐项自查,能改的当场改掉 |
 | 二 | 干净上下文的 AI 审查 | 新开会话,只给 diff + 任务简述 + 本清单;再跑一轮减法审查:「删掉哪些代码不影响验收?」 |
-| 三 | 你的人审 | 只聚焦测试与验收标准;AI 味问题应已在前两遍清零 |
+| 三 | 你的人审 | 按第 1 节顺序:先 plan 与契约 diff,再测试与验收标准;AI 味问题应已在前两遍清零 |
 
 ## 流程串联
 
-分步小 diff(习惯)→ 自审对照本清单 → push 前固化跑 `/code-review` 与 `/security-review`（独立上下文第一道闸，〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md）→ 二遍 AI 审查 + 减法审查 → 人审聚焦测试与验收 → 通过后进入阶段6,见 [完成定义](definition-of-done.md) 第 4 节。
+分步小 diff(习惯)→ 自审对照本清单 → push 前固化跑 `/code-review` 与 `/security-review`（独立上下文第一道闸，〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md）→ 二遍 AI 审查 + 减法审查 → 人审按第 1 节分层 → 通过后进入阶段6,见 [完成定义](definition-of-done.md) 第 4 节。
 
 审查中反复出现的新症状,记入 [痛点日志](../docs/pain-log.md)(pain log);重复两次以上,按 [三连筛](../CLAUDE.md) 决定沉淀为配置/钩子、CLAUDE.md 还是规则(阶段8 沉淀)。

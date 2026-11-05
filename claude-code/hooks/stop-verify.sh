@@ -15,7 +15,8 @@ stop_hook_active() {
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null
   elif command -v python3 >/dev/null 2>&1; then
-    printf '%s' "$INPUT" | python3 -c '
+    # -I 隔离模式：不从 cwd 导入模块，防项目里同名的 json.py 顶替标准库（下方 has_npm_script 同理）
+    printf '%s' "$INPUT" | python3 -I -c '
 import json, sys
 try:
     print("true" if json.load(sys.stdin).get("stop_hook_active") else "false")
@@ -53,7 +54,7 @@ has_npm_script() {
   if command -v jq >/dev/null 2>&1; then
     jq -e --arg s "$1" '.scripts[$s]' package.json >/dev/null 2>&1
   elif command -v python3 >/dev/null 2>&1; then
-    python3 -c '
+    python3 -I -c '
 import json, sys
 try:
     ok = bool(json.load(open("package.json")).get("scripts", {}).get(sys.argv[1]))

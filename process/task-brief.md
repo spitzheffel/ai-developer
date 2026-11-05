@@ -36,6 +36,8 @@
 - 约束里“引库还是自研”拿不准 → 按 [build-vs-buy](./build-vs-buy.md) 的默认值填。
 - 涉及文件列不出来 → 查项目 CLAUDE.md 的模块地图（模板见 [CLAUDE.md.template](../templates/CLAUDE.md.template)），还列不出就按 L 级办。
 
+**UI 任务附加栏**（M 级起，配套 [DESIGN.md.template](../templates/DESIGN.md.template)）：线框=先贴 ASCII 线框锁结构再谈视觉；风格锚=参照站链接或截图贴进简述；scope=be ambitious：空态、错误态、保存流、键盘导航，不只是布局。（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md）
+
 ## 「非目标」：全模板性价比最高的一栏
 
 模型的默认行为是加戏：顺手重构、顺手升级依赖、顺手“优化”相邻代码。

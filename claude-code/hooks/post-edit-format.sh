@@ -16,7 +16,8 @@ extract_file_path() {
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null
   elif command -v python3 >/dev/null 2>&1; then
-    printf '%s' "$INPUT" | python3 -c '
+    # -I 隔离模式：不从 cwd 导入模块，防项目里同名的 json.py 顶替标准库
+    printf '%s' "$INPUT" | python3 -I -c '
 import json, sys
 try:
     ti = json.load(sys.stdin).get("tool_input") or {}

@@ -10,7 +10,8 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default defineConfig(
-  globalIgnores(['dist', 'coverage']),
+  // src/api/generated 是 OpenAPI 生成物（只读）：lint 它只会诱导手改产物，contracts-ci 的逐字比对随之误报
+  globalIgnores(['dist', 'coverage', 'src/api/generated']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

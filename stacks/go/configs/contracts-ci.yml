@@ -1,0 +1,85 @@
+# 契约门禁 CI 模板(Go 栈):派生工件与真源不一致、或 API 出现破坏性变更,PR 直接红。
+# 选型与索引见 ../README.md 第 1、7 节;方案出处 docs/research/adoption-plan.md W7(两档制:模板先入库,用到才复制)。
+#
+# 启用条件:
+#   - 复制时机 = 下一个真实 API 项目开工;复制到 .github/workflows/contracts.yml,再按下两条删掉用不到的 job。
+#   - 无数据库 → 删 db-schema job;无对外 API(纯内部服务/CLI)→ 删 api-contract job。
+#   - 接口用 proto/gRPC 定义 → 删 api-contract,换文件末尾注释里的 proto-contract 变体。
+#   - 首个引入 api/openapi.json 的 PR:基线分支里还没有该文件,oasdiff 必失败——先单独合入 spec,再开这道门。
+#
+# 本地再生成命令(改了 schema/接口就跑,工件与代码同一个 PR 提交):
+#   tbls doc --rm-dist --er-format mermaid       # TBLS_DSN 指向跑完迁移的本地库;ER 图落 Mermaid 文本,可 diff、GitHub 原生渲染
+#   go run ./cmd/api openapi > api/openapi.json  # Huma:cmd/<app> 按 huma.rocks/features/cli 加 openapi 子命令,输出 api.OpenAPI().MarshalJSON()
+#
+# 一次性前置(保留 api-contract job 时):仓库根放 .spectral.yaml,最小一行 extends: ["spectral:oas"](Spectral 6 没有规则集就拒绝 lint);
+#   要卡「每个 operation 必有 operationId/description」再加 rules: {operation-operationId: error, operation-description: error}(两条默认只 warn,不挡合并)。
+
+name: contracts
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  db-schema: # dbdoc/ 必须与「空库跑完全部迁移」后的真库一致
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17 # 与生产同主版本
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TBLS_DSN: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+      TBLS_DOC_PATH: dbdoc
+    steps:
+      - uses: actions/checkout@v7
+      - name: 空库跑完全部迁移
+        # migrations/ 为只向前的纯 SQL 时直接可用;用 goose/migrate 等工具就换成它的 up 命令
+        run: for f in migrations/*.sql; do psql -v ON_ERROR_STOP=1 "$TBLS_DSN" -f "$f"; done
+      - uses: k1low/setup-tbls@v1
+      - name: tbls diff(库与已提交的 dbdoc/ 不一致即 exit 1)
+        # 必须「DSN + 文档路径」两参:无参时 --er-format 被静默忽略、回落 svg,与本地 mermaid 生成的 dbdoc/ 必不一致而恒红
+        run: tbls diff "$TBLS_DSN" "$TBLS_DOC_PATH" --er-format mermaid
+
+  api-contract: # 再生成的 openapi.json 必须已提交;对基线分支的破坏性变更卡合并;Spectral 卡 spec 质量
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: 再生成契约工件
+        # Huma(code-first,默认):从代码导出 spec。
+        # oapi-codegen(spec-first,spec 要跨语言共享时):spec 是手写真源,本步换成 go generate ./... 再生成 Go 代码。
+        run: go run ./cmd/api openapi > api/openapi.json
+      - name: drift 检查(真源变了而工件没再生成即 fail)
+        run: git add -N . && git diff --exit-code
+      - name: 取基线分支
+        run: git fetch --depth=1 origin ${{ github.base_ref }}
+      - name: oasdiff 破坏性变更检查
+        uses: oasdiff/oasdiff-action/breaking@v0
+        with:
+          base: 'origin/${{ github.base_ref }}:api/openapi.json'
+          revision: 'HEAD:api/openapi.json'
+          fail-on: ERR
+          review: false # 不把 spec 上传 oasdiff.com,结果只留在 CI
+      - name: Spectral lint(spec 质量门,规则集见仓库根 .spectral.yaml)
+        run: npx --yes @stoplight/spectral-cli@6 lint api/openapi.json --fail-severity error
+
+  # proto-contract: # 接口用 proto/gRPC 的项目以本 job 替换 api-contract(buf.yaml 在仓库根)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #     - uses: bufbuild/buf-action@v1
+  #       with:
+  #         breaking: true # 对比 PR 基线分支,破坏性变更即 fail
+  #         pr_comment: false # 不发 PR 评论,免开 pull-requests: write
