@@ -32,27 +32,33 @@
 │   ├── definition-of-done.md      # 阶段4 验证：完成定义、修 bug 铁律
 │   ├── build-vs-buy.md            # 阶段2 方案：轮子vs自研、绝不自研清单
 │   ├── review-checklist.md        # 阶段5 审查：审查清单
-│   └── session-management.md      # 阶段7 会话管理：止损、落盘
+│   ├── session-management.md      # 阶段7 会话管理：止损、落盘
+│   ├── adr.md                     # 阶段2 方案：架构决策记录(ADR)何时写、怎么写
+│   └── multi-agent.md             # 阶段7 会话管理：多 agent 并行写入的协作协议
 ├── templates/                     # 复制进新项目再填空的模板
 │   ├── CLAUDE.md.template         # 项目级 CLAUDE.md（含模块地图）
-│   └── plan.md.template           # 阶段2 方案文档
+│   ├── plan.md.template           # 阶段2 方案文档
+│   ├── GLOSSARY.md.template       # 业务术语表：统一业务词与代码命名
+│   ├── CONTEXT-MAP.md.template    # 业务→代码上下文地图
+│   └── DESIGN.md.template         # 设计系统约束：反默认美学与黑名单
 ├── claude-code/                   # Claude Code 本体配置
 │   ├── hooks.md                   # 钩子安装与说明
 │   ├── settings.json.example      # settings 示例
 │   └── hooks/
 │       ├── post-edit-format.sh    # 编辑后自动格式化
+│       ├── pre-edit-migrations.sh # 编辑前拦截已提交迁移文件的改动
 │       └── stop-verify.sh         # 收尾前自动验证
 └── stacks/                        # 每栈一目录：README（固定七节）+ configs
     ├── _template.md               # 新栈起步骨架
     ├── typescript-react/
     │   ├── README.md
-    │   └── configs/               # eslint.config.js、tsconfig.json、.prettierrc.json
+    │   └── configs/               # eslint.config.js、tsconfig.json、.prettierrc.json、.dependency-cruiser.cjs、contracts-ci.yml
     ├── python/
     │   ├── README.md
-    │   └── configs/               # pyproject.toml
+    │   └── configs/               # pyproject.toml、contracts-ci.yml
     └── go/
         ├── README.md
-        └── configs/               # .golangci.yml
+        └── configs/               # .golangci.yml、contracts-ci.yml
 ```
 
 ## 快速开始

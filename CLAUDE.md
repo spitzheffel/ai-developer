@@ -7,6 +7,7 @@
 ## 新增规则的唯一入口
 
 - 任何新规则必须注明来源痛点，引用 [docs/pain-log.md](docs/pain-log.md) 条目（如 `来源：pain-log 2026-10-19`）。没有痛点来源，一律拒收。
+- 第二入口：外部调研引入的预防性规则，须注明调研来源、正文带〔试用〕标记，半年内未在真实任务中用上即删（来源：调研 2026-11，[docs/research/adoption-plan.md](docs/research/adoption-plan.md)）。
 - 先过三连筛，再定落点：
   1. 能被工具强制 → 写成配置/钩子（`stacks/*/configs/`、`claude-code/`），不写字。
   2. 因缺上下文而犯 → 写进 [templates/CLAUDE.md.template](templates/CLAUDE.md.template) 的模块地图/参照范例。
@@ -22,6 +23,12 @@
 
 「遵循最佳实践」「保持简洁优雅」这类不可判定的句子，见一句删一句。
 
+## prose 规则的元方法
+
+1. 入库前压力测试：用无规则的 fresh 会话复现失败并设对照组，对照组不犯错就不写。
+2. 按失败类型选形态：禁止式+「借口→反驳」表只治明知故犯；输出形状问题写正向配方。
+3. 禁「除非必要」「尽量」式软化语。❌「除非必要不要改接口」 ✅「不得改公开接口签名」
+
 ## 行数预算（硬上限；超了先删后加，不准先加再说）
 
 | 文件 | 上限 |
@@ -34,6 +41,7 @@
 | process/ 各文件 | 120 |
 | templates/CLAUDE.md.template | 150 |
 | templates/plan.md.template | 60 |
+| templates/ 其余模板 | 各 80 |
 | stacks/_template.md | 80 |
 | stacks/*/README.md | 200 |
 | claude-code/hooks.md | 120 |
