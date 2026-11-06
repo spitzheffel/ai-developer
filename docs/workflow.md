@@ -105,7 +105,7 @@
 **【对策】**
 
 - `[规则]` 完成定义:说"完成"之前必须跑过的命令清单,见[完成定义](../process/definition-of-done.md)。
-- `[配置/钩子]` Stop 钩子在收工前强制跑 lint/typecheck/vet/build 等快检,任一失败即打回;它不跑测试,也判不了完成声明的真伪——测试仍按完成定义手动跑并贴出输出:见 [hooks](../claude-code/hooks.md) 与 [stop-verify.sh](../claude-code/hooks/stop-verify.sh)。
+- `[配置/钩子]` Stop 钩子在收工前跑 lint/typecheck/vet/build 等快检(自上次通过后工作区没变就跳过),任一新失败即打回、同一组失败只打回一次;它不跑测试,也判不了完成声明的真伪——测试仍按完成定义手动跑并贴出输出:见 [hooks](../claude-code/hooks.md) 与 [stop-verify.sh](../claude-code/hooks/stop-verify.sh)。
 - `[规则]` 修 bug 铁律:❌ 直接改代码宣布修好 ✅ 先写失败测试复现,再修到变绿。
 - `[习惯]` UI 改动让它用 Playwright 截图自查,看真实渲染结果,而不是想象渲染结果。
 - `[规则]` 产出物 = 代码 + 再生成的契约工件(schema 文档 / openapi / 状态机图),drift 检查见各栈 `configs/contracts-ci.yml`(如 [stacks/typescript-react/configs/contracts-ci.yml](../stacks/typescript-react/configs/contracts-ci.yml))。（〔试用〕来源:调研 2026-11,docs/research/adoption-plan.md）

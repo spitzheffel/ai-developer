@@ -50,6 +50,7 @@ jobs:
           "$RUNNER_TEMP/gitleaks" git . --redact --no-banner -v --exit-code 2
 
   deps:
+    # 不按「是否动了依赖」过滤：govulncheck 看的是代码调用到了哪些有漏洞的函数，只改代码也可能改变结论
     runs-on: ubuntu-latest # 不设 if：push / PR 和每周定时都跑
     steps:
       - uses: actions/checkout@v7

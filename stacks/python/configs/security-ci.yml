@@ -1,7 +1,7 @@
 # 安全门禁 CI 模板（python 栈）：OP1「安全双层」的 CI 层。复制为项目的 .github/workflows/security.yml，标 <占位> 的行按项目改。
 # 两类风险，各两道关。本地层是两个钩子：Claude Code 的 pre-write-secrets.sh（写盘前）与 git 的 githooks/pre-commit（提交前），装法见 claude-code/hooks.md。
 #   secrets     每次 push / PR 用 gitleaks 扫全部历史：本地钩子可被 --no-verify 跳过、新机器可能没装，CI 这层绕不过去
-#   deps        每次 push / PR：先 uv lock --check，再 uv audit（读 uv.lock 查 OSV，默认连 dev 组一起审计）
+#   deps        这次 push / PR 动了 pyproject.toml 或 uv.lock 才跑：先 uv lock --check，再 uv audit（读 uv.lock 查 OSV，默认连 dev 组一起审计）；没动就跳过
 #   osv-weekly  每周一 osv-scanner 全量：新披露的漏洞不随代码变更出现，只靠 push / PR 会漏；OSV 还收录已知恶意包（MAL-）
 # uv audit 至今仍是 preview：CI 必须钉 uv 版本。≥0.12.14 起「锁过期」与「有漏洞」都是 exit 1，所以拆成两步分开报。
 # 忽略漏洞：deps 用 pyproject 的 [tool.uv.audit] ignore = ["GHSA-..."]（ID 区分大小写，没有理由与到期字段，注释里写清）；
@@ -52,14 +52,36 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 2 # PR 检出的是合并提交，要拿到它的父提交（基线）做对比
           persist-credentials: false
+      - name: 这次是否动了依赖（判断不了就照常审计，绝不默认跳过）
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PATTERN: '(^|/)(pyproject\.toml|uv\.lock)$'
+        run: |
+          base=""
+          if [ "$EVENT" = pull_request ]; then base=HEAD^1
+          elif [ "$EVENT" = push ] && git fetch -q --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then base="$BEFORE"
+          fi
+          files=""
+          if [ -n "$base" ] && ! files="$(git diff --name-only "$base" HEAD 2>/dev/null)"; then base=""; fi
+          if [ -z "$base" ] || printf '%s\n' "$files" | grep -qE "$PATTERN"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pyproject.toml 与 uv.lock 都没变，跳过本次审计；新披露的漏洞由每周的 osv-weekly 兜底"
+          fi
       - uses: astral-sh/setup-uv@v10.3.3 # setup-uv 从 v8 起不再发布浮动大版本 tag，没有 @v10
+        if: steps.changed.outputs.run == 'true'
         with:
           version: "0.13.7" # 必须钉死：audit 仍是 preview，行为随版本变；升级前读 CHANGELOG 的 Preview features
           enable-cache: false # 审计不装包，缓存没有收益
       - name: 锁文件与 pyproject 一致（不一致即红，与漏洞分开报）
+        if: steps.changed.outputs.run == 'true'
         run: uv lock --check
       - name: uv audit（有漏洞 exit 1；网络或内部错误 exit 2）
+        if: steps.changed.outputs.run == 'true'
         run: uv audit --frozen --preview-features audit-command
 
   osv-weekly:

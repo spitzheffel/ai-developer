@@ -1,7 +1,7 @@
 # 安全门禁 CI 模板（TS/React 栈）：OP1「安全双层」的 CI 层。复制为项目的 .github/workflows/security.yml，标 <占位> 的行按项目改。
 # 两类风险，各两道关。本地层是两个钩子：Claude Code 的 pre-write-secrets.sh（写盘前）与 git 的 githooks/pre-commit（提交前），装法见 claude-code/hooks.md。
 #   secrets     每次 push / PR 用 gitleaks 扫全部历史：本地钩子可被 --no-verify 跳过、新机器可能没装，CI 这层绕不过去
-#   deps        每次 push / PR 跑 pnpm audit，high 及以上即红
+#   deps        这次 push / PR 动了依赖清单或 lockfile 才跑 pnpm audit，high 及以上即红；没动就跳过，免得新披露一个漏洞，所有无关 PR 一起变红
 #   osv-weekly  每周一 osv-scanner 全量：新披露的漏洞不随代码变更出现，只靠 push / PR 会漏；OSV 还收录已知恶意包（MAL-）
 # 本栈特有两点：
 #   - 钉了 pnpm 12 的 pnpm-lock.yaml 是两段式，GitHub 依赖图读不出，Dependabot alerts 与恶意包告警都失明，osv-weekly 不可删。
@@ -49,9 +49,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 2 # PR 检出的是合并提交，要拿到它的父提交（基线）做对比
           persist-credentials: false
+      - name: 这次是否动了依赖（判断不了就照常审计，绝不默认跳过）
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PATTERN: '(^|/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$'
+        run: |
+          base=""
+          if [ "$EVENT" = pull_request ]; then base=HEAD^1
+          elif [ "$EVENT" = push ] && git fetch -q --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then base="$BEFORE"
+          fi
+          files=""
+          if [ -n "$base" ] && ! files="$(git diff --name-only "$base" HEAD 2>/dev/null)"; then base=""; fi
+          if [ -z "$base" ] || printf '%s\n' "$files" | grep -qE "$PATTERN"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "依赖清单与 lockfile 都没变，跳过本次审计；新披露的漏洞由每周的 osv-weekly 兜底"
+          fi
       - uses: pnpm/action-setup@v6 # 不写 version：读 package.json 的 packageManager
+        if: steps.changed.outputs.run == 'true'
       - name: pnpm audit（只读 pnpm-lock.yaml，不用 install；默认级别 low 太吵）
+        if: steps.changed.outputs.run == 'true'
         run: pnpm audit --audit-level high
         # 忽略项写 pnpm-workspace.yaml 的 audit.ignore：只认 GHSA ID、没有过期机制，注释里写清理由与复查日
 

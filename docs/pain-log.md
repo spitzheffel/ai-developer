@@ -26,6 +26,13 @@
 
 ## 已落地
 
+### 2026-11-06 验证与审查不分大小，小改动也走全套
+
+- 现象：改一行文案也要走完成定义六条（含双视口截图）、push 前两道审查再加三遍审查；Stop 钩子每个回合都跑全套快检，纯问答也跑，还会因为改动前就有的 lint 错误把 Claude 打回去修范围外的文件；上游新披露一个漏洞，依赖审计让所有无关 PR 一起变红。期望：验证与审查的深浅跟着改动大小与风险走。
+- 归类：真规则（规则过重，按档收窄适用范围）
+- 处置：[完成定义](../process/definition-of-done.md)与[审查清单](../process/review-checklist.md)按[任务简述](../process/task-brief.md)的 S/M/L 分档，碰到高风险路径一律按 L 级；[CLAUDE.md 模板](../templates/CLAUDE.md.template)第 7 节的测试范围同步分档；[stop-verify.sh](../claude-code/hooks/stop-verify.sh) 工作区没变就放行、同一组失败只打回一次、只要求修本次引入的问题；TS 与 python 的 `configs/security-ci.yml` 依赖审计只在依赖清单或 lockfile 变化时卡 PR，新披露的漏洞交给每周扫描。
+- 状态：已落地
+
 ### 2026-11-06 〔调研引入〕可选池 OP1 安全双层（密钥扫描 + 依赖审计）
 
 - 现象：密钥泄漏与依赖漏洞，全库此前只有 principles 第 11 条一句 prose，没有任何机器兜底；调研可选池把它列为第一项（无前置、收益/成本比高）。

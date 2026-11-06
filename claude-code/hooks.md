@@ -10,11 +10,11 @@
 | 脚本 | 挂载事件 | 做什么 | 失败时 |
 | --- | --- | --- | --- |
 | [post-edit-format.sh](hooks/post-edit-format.sh) | PostToolUse，matcher `Edit\|Write\|NotebookEdit` | 刚编辑的文件按扩展名格式化：ts/tsx/js/jsx/json/css/md → 项目本地 prettier（有 `node_modules/.bin/prettier` 才跑）；py → ruff format；go → gofmt -w | 恒 `exit 0` 永不阻塞——格式化是锦上添花，不配打断会话 |
-| [stop-verify.sh](hooks/stop-verify.sh) | Stop（不支持 matcher，每次收工都触发） | 按标志文件探测项目类型跑快检：package.json → 其中存在的 lint/typecheck 脚本；pyproject.toml → ruff check；go.mod → go vet + go build | 任一失败 → `exit 2` 打回：不许收工，stderr 失败摘要自动喂回继续修 |
+| [stop-verify.sh](hooks/stop-verify.sh) | Stop（不支持 matcher，每次收工都触发） | 自上次通过后工作区没变就直接放行；有改动才按标志文件探测项目类型跑快检：package.json → 其中存在的 lint/typecheck 脚本；pyproject.toml → ruff check；go.mod → go vet + go build | 任一失败 → `exit 2` 打回，stderr 失败摘要喂回，只要求修本次改动引入的问题；同一组失败只打回一次，再出现只提示你 |
 | [pre-edit-migrations.sh](hooks/pre-edit-migrations.sh) | PreToolUse，matcher `Edit\|Write` | 要编辑的路径含迁移目录段就拦（大小写不敏感）：`migrations/`、`db/migrate/`、`db/migration/`、`alembic/versions/`；形态不全就改脚本里的 case | 命中 → `exit 2`：本次 Edit/Write 不执行，stderr 理由（migration 只许人审后新增，AI 不得改写既有迁移）喂回 Claude；取不到路径 → 放行 |
 | [pre-write-secrets.sh](hooks/pre-write-secrets.sh) | PreToolUse，matcher `Write\|Edit\|NotebookEdit` | 把待写入的文本（Write 的 content、Edit 的 new_string、NotebookEdit 的 new_source）喂给 `gitleaks stdin`；需本机已装 gitleaks（`brew install gitleaks` 或官方 release 二进制），没装就放行 | 疑似密钥 → `exit 2`：本次写入不执行，gitleaks 打码后的发现与改法喂回 Claude；gitleaks 自身出错 → 放行 |
 
-stop-verify.sh 是激进钩子：**每次收工都跑全套快检**。快检超过约 30 秒的项目要精简：删掉脚本里慢的检查段（典型是 go build、大仓 typecheck），或不挂 Stop 钩子，退回[阶段4 验证](../docs/workflow.md)手动跑。
+stop-verify.sh 只在有改动时跑：工作区指纹记在 `.git/claude-stop-verify.*`，删掉它们就强制下次收工重跑；不是 git 仓库时退回旧行为，每次收工都跑。快检超过约 30 秒的项目仍要精简：删掉脚本里慢的检查段（典型是 go build、大仓 typecheck），或不挂 Stop 钩子，退回[阶段4 验证](../docs/workflow.md)手动跑。
 
 pre-edit-migrations.sh 是护栏不是安全边界：它只管 Edit/Write，模型仍可能绕道 Bash 改迁移；真边界是凭证隔离——AI 不持有生产库凭证。❌ 本机 `.env` 里放着生产库连接串，AI 跑一句 `alembic upgrade head` 就直连生产 ✅ AI 会话的环境里只有本地/测试库连接串。迁移纪律三条与 roll-forward-only 见[脚本头注释](hooks/pre-edit-migrations.sh)，安装见下节末。（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md）
 
@@ -107,7 +107,7 @@ bash -n .claude/hooks/stop-verify.sh                   # 只验语法
 echo '{"tool_input":{"file_path":"'$PWD'/src/a.ts"}}' \
   | .claude/hooks/post-edit-format.sh; echo "exit=$?"  # 期望 0，且文件被格式化
 echo '{"stop_hook_active":false}' \
-  | .claude/hooks/stop-verify.sh; echo "exit=$?"       # 快检全过=0；有失败=2 且 stderr 有摘要
+  | .claude/hooks/stop-verify.sh; echo "exit=$?"       # 全过或工作区没变=0；新失败=2 且 stderr 有摘要
 echo '{"stop_hook_active":true}' \
   | .claude/hooks/stop-verify.sh; echo "exit=$?"       # 必须恒 0，否则防死循环失效
 echo '{"tool_input":{"file_path":"/p/db/migrations/001.sql"}}' \

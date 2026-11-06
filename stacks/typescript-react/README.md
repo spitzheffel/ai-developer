@@ -24,7 +24,7 @@
 | API mock | MSW：全局 handlers 只放成功态，错误/边界态在用例里 `server.use()` 覆盖；测试 `server.listen({ onUnhandledFrame: 'error' })`（MSW 3 键名，2.x 为 onUnhandledRequest）；handlers 从 spec 生成（orval 的 mock 产物），faker 固定 seed | 手写散装 mock（vi.mock 掉 client、组件里塞假数据） | 未 mock 的请求当场炸出来；手写 handlers 必漂移，固定 seed 让失败可复现（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md） |
 | Lint/Format | ESLint 9 flat + typescript-eslint + Prettier | 与 Biome 规则级混搭 | Biome 是注明的整体替代：二选一，不混用 |
 | 依赖边界 | dependency-cruiser（[规则文件](configs/.dependency-cruiser.cjs)）；存量项目先 `--baseline` 记下旧账，CI 跑 `--ignore-known` 只红新增 | 无边界规则裸跑 | 越界 CI 直接红，AI 在循环里看到红自己修；规则文件兼作架构文档与 AI 边界输入（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md） |
-| 依赖审计 | `pnpm audit --audit-level high` 当 PR 门禁 + 每周 osv-scanner 全量（[configs/security-ci.yml](configs/security-ci.yml)） | 另起 snyk、npm audit 一套；用默认级别 low | pnpm 自带、只读 lockfile；钉了 pnpm 12 的两段式 lockfile 让 Dependabot 失明，周扫是唯一的持续信号（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md OP1） |
+| 依赖审计 | 依赖清单或 lockfile 有变化时 `pnpm audit --audit-level high` 卡 PR，每周 osv-scanner 全量兜底新披露的漏洞（[configs/security-ci.yml](configs/security-ci.yml)） | 另起 snyk、npm audit 一套；用默认级别 low | pnpm 自带、只读 lockfile；钉了 pnpm 12 的两段式 lockfile 让 Dependabot 失明，周扫是唯一的持续信号（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md OP1） |
 
 ## 2. 工具链与命令
 
@@ -149,4 +149,4 @@ export function QueryBoundary<T>({ query, skeleton, empty, isEmpty, children }: 
 | [configs/.prettierignore](configs/.prettierignore) | 排除 `src/api/generated`：生成物保持原样，contracts-ci 的逐字比对才不误报（ESLint 侧同在 globalIgnores 排除） |
 | [configs/.dependency-cruiser.cjs](configs/.dependency-cruiser.cjs) | 依赖边界五条：无循环 / 孤儿告警 / feature 间禁互依 / 共享层不依赖 feature / 单一 HTTP 出口；注释含 `--baseline` + `--ignore-known` 基线法与 mermaid/archi 出图命令 |
 | [configs/contracts-ci.yml](configs/contracts-ci.yml) | 契约 CI 模板（有对外 API 的项目才启用）：重新生成接口类型后 git diff 防漂移 + oasdiff 对比 main 上的 spec，ERR 级破坏性变更即红 |
-| [configs/security-ci.yml](configs/security-ci.yml) | 安全门禁 CI 模板（直接启用，复制为 `.github/workflows/security.yml`）：gitleaks 每次扫全部历史 + pnpm audit 卡 PR + 每周 osv-scanner 全量；本地两个钩子见 [claude-code/hooks.md](../../claude-code/hooks.md) |
+| [configs/security-ci.yml](configs/security-ci.yml) | 安全门禁 CI 模板（直接启用，复制为 `.github/workflows/security.yml`）：gitleaks 每次扫全部历史 + 依赖有变化时 pnpm audit 卡 PR + 每周 osv-scanner 全量；本地两个钩子见 [claude-code/hooks.md](../../claude-code/hooks.md) |
