@@ -18,6 +18,8 @@
 .
 ├── README.md                      # 仓库门面（本文件）
 ├── CLAUDE.md                      # 在本仓库里工作时的维护规则
+├── .claude/settings.json          # 本库自己的 Claude Code 配置：写盘前拦密钥、收工前跑自检
+├── .github/workflows/check.yml    # 本库自己的 CI：每次 push 跑自检，再冒烟测试安装脚本
 ├── docs/
 │   ├── workflow.md                # 8 阶段工作流全景（阶段0 环境底座 → 阶段8 沉淀）
 │   ├── pain-log.md                # 痛点日志(pain log)：全库规则的唯一来源
@@ -51,6 +53,9 @@
 │       ├── pre-edit-migrations.sh # 编辑前拦截迁移目录内的 Edit/Write
 │       ├── pre-write-secrets.sh   # 写盘前用 gitleaks 拦密钥
 │       └── stop-verify.sh         # 收尾前自动验证
+├── scripts/                       # 本库的维护脚本
+│   ├── check.py                   # 自检：行数预算、结构、链接、目录树、配置语法
+│   └── install.sh                 # 一条命令把模板、配置、钩子、CI 模板装进目标项目
 └── stacks/                        # 每栈一目录：README（固定七节）+ configs
     ├── _template.md               # 新栈起步骨架
     ├── typescript-react/
@@ -73,13 +78,15 @@
 3. 让 Claude 在任务中遵循 process/ 的五步流程：[任务简述](process/task-brief.md) → [轮子vs自研](process/build-vs-buy.md) → [完成定义](process/definition-of-done.md) → [审查清单](process/review-checklist.md) → [会话管理](process/session-management.md)。
 4. 开始记 [docs/pain-log.md](docs/pain-log.md)：每次被 AI 坑，当场记一条。
 
+第 1、2 步的复制可以一条命令做完：`<本库路径>/scripts/install.sh <项目目录> <栈>`（栈为 typescript-react、python、go）。已存在的文件一律跳过，加 `--dry-run` 先看会写哪些文件；装完照它最后打印的「接下来」逐项做，CLAUDE.md 仍要你自己填。
+
 ## 仓库如何生长
 
 不自顶向下编规则，主入口是痛点日志（调研引入的预防性规则走 [CLAUDE.md](CLAUDE.md) 的第二入口，带〔试用〕标记）：
 
 被坑 → 记进 [docs/pain-log.md](docs/pain-log.md) → 过三连筛（能被工具强制？→ 配置/钩子；因缺上下文而犯？→ CLAUDE.md 地图/参照范例；剩下 → prose 规则）→ 归位到对应文件，条目标「已落地」。
 
-在本仓库里增删内容前，先读 [CLAUDE.md](CLAUDE.md)：质量门槛、行数预算、术语表都在那里。
+在本仓库里增删内容前，先读 [CLAUDE.md](CLAUDE.md)：质量门槛、行数预算、术语表都在那里。改完跑 `python3 scripts/check.py`；本库的 Stop 钩子和 CI 也会自动跑它。
 
 ## 现状与路线
 

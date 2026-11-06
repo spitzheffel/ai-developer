@@ -28,7 +28,7 @@ cp <本库路径>/claude-code/hooks/*.sh .claude/hooks/
 chmod +x .claude/hooks/*.sh
 ```
 
-再把 [settings.json.example](settings.json.example) 合并进项目的 `.claude/settings.json`：`hooks` 段整段拷；`permissions.allow` 按你的栈删掉用不上的命令。JSON 不允许注释，对那份文件的全部解释都在本文。钩子以你的本机权限直接运行，合并任何来源的钩子配置前先把脚本读一遍。
+也可以用 [scripts/install.sh](../scripts/install.sh) 一条命令装好钩子、按栈生成 settings（见 README 快速开始）。手动装就再把 [settings.json.example](settings.json.example) 合并进项目的 `.claude/settings.json`：`hooks` 段整段拷；`permissions.allow` 按你的栈删掉用不上的命令。JSON 不允许注释，对那份文件的全部解释都在本文。钩子以你的本机权限直接运行，合并任何来源的钩子配置前先把脚本读一遍。
 
 `permissions` 段三条语义：
 
