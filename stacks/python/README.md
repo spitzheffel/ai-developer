@@ -23,6 +23,7 @@
 | Lint + Format | ruff 全包 | black/isort/flake8 叠加 | ruff 一个工具全管 |
 | 类型检查 | mypy（strict 基线，放宽只按模块在 overrides 做） | — | — |
 | 依赖边界 | import-linter `layers` 契约（`uv run lint-imports`；配置见 [configs/pyproject.toml](configs/pyproject.toml) 的 `[tool.importlinter]`） | 跨层随意 import、只靠 review 肉眼守分层 | 层名即架构文档，越界即红、AI 看到红自己修（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md） |
+| 依赖审计 | `uv audit` 当 PR 门禁（CI 钉 uv 版本）+ 每周 osv-scanner 全量（[configs/security-ci.yml](configs/security-ci.yml)） | 新项目引 pip-audit / safety | uv 内置，读 uv.lock 查 OSV，不另装工具；默认连 dev 组一起审计（〔试用〕来源：调研 2026-11，docs/research/adoption-plan.md OP1） |
 
 ## 2. 工具链与命令
 
@@ -38,6 +39,7 @@
 | Lint + 自动修复 | `uv run ruff check --fix` |
 | 格式化 | `uv run ruff format`（只校验不改码用 `--check`） |
 | 类型检查 | `uv run mypy src/` |
+| 依赖审计 | `uv audit --frozen --preview-features audit-command`（不带 --frozen/--locked 会重新解析并改写 uv.lock） |
 
 - 提交前全套：`uv run ruff check --fix && uv run ruff format && uv run mypy src/ && uv run lint-imports && uv run pytest`。
 - 编辑后自动跑 `ruff format` 的钩子接法见 [claude-code/hooks.md](../../claude-code/hooks.md)。
@@ -144,5 +146,7 @@ async def canonical_log_line(request: Request, call_next: RequestResponseEndpoin
 | --- | --- | --- |
 | [configs/pyproject.toml](configs/pyproject.toml) | `[project]` 骨架 + `[build-system]`（uv_build，src layout 装 editable）+ ruff（lint/format）+ pytest（含 asyncio auto）+ mypy strict 基线 + import-linter 分层契约 | `uv init --package` 后整份覆盖，改 `name`（`[tool.importlinter]` 的 root_package、containers 同改）与依赖后 `uv sync`；`[build-system]` 必留 |
 | [configs/contracts-ci.yml](configs/contracts-ci.yml) | GitHub Actions 契约门禁：迁移后 `alembic check` + `tbls diff` 防 dbdoc/ 漂移；导出 openapi.json 后 `git diff --exit-code` + oasdiff（`fail-on: ERR`）+ Spectral lint | 触发制：真实 API 项目开工才复制为 `.github/workflows/contracts.yml`，前置见文件头注释；无对外 API 删 `api-contract` job |
+| [configs/security-ci.yml](configs/security-ci.yml) | 安全门禁：gitleaks 每次扫全部历史；`uv lock --check` + `uv audit` 卡 PR；每周 osv-scanner 全量 | 直接启用：复制为 `.github/workflows/security.yml`；本地两个钩子见 [claude-code/hooks.md](../../claude-code/hooks.md) |
+| [configs/osv-scanner.toml](configs/osv-scanner.toml) | 排除 editable 根包（本项目自身）+ 忽略项写法 | 复制到 uv.lock 同目录，`name` 与 `[project].name` 同改 |
 
 ruff/mypy 报错默认改代码不改配置。确要放宽：ruff 动 `[tool.ruff.lint]`，mypy 加 `[[tool.mypy.overrides]]` 按模块放，并在提交说明里写原因；禁无注释的行内 `# noqa` / `# type: ignore`。

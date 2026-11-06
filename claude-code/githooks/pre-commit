@@ -1,0 +1,22 @@
+#!/bin/sh
+# githooks/pre-commit —— git 提交前钩子：gitleaks 只扫暂存改动，发现疑似密钥就中止提交；人和 AI 的提交都拦。
+# 它由 git 执行，不归 Claude Code 管。来源：调研 2026-11，docs/research/adoption-plan.md 可选池 OP1（安全双层的本地层）。
+# 安装（在目标项目根）：cp -r <本库路径>/claude-code/githooks .githooks && git config core.hooksPath .githooks
+#   项目已用 husky 等工具管理 core.hooksPath 的，不要改它，改为在那边的 pre-commit 里加：gitleaks git --pre-commit --staged --redact
+# 本地层可被 git commit --no-verify 跳过、新机器也可能没装 gitleaks：权威层是各栈 configs/security-ci.yml 的 CI 全量扫描。
+# 没装 gitleaks 时只告警、不拦提交：缺工具不该卡住工作，兜底交给 CI。
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit：未安装 gitleaks，本次跳过密钥扫描（安装：brew install gitleaks，或下载 GitHub release 二进制）" >&2
+  exit 0
+fi
+
+# --staged 不能省：只写 --pre-commit 扫的是未暂存的改动，真正要提交的内容反而漏掉
+gitleaks git --pre-commit --staged --redact --no-banner -v
+rc=$?
+
+if [ "$rc" -ne 0 ]; then
+  echo "pre-commit：gitleaks 发现疑似密钥或扫描出错（见上方输出），已中止提交。" >&2
+  echo "真密钥：移出代码改读环境变量，若曾提交或推送过，再到提供方轮换；确为测试假值：在该行加注释 gitleaks:allow。" >&2
+fi
+exit "$rc"

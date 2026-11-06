@@ -2,7 +2,7 @@
 # 各项取舍与禁用项见 ../README.md 第 1 节、第 7 节。
 
 [project]
-name = "example"            # 改成真实包名，与 src/<package> 目录名一致
+name = "example"            # 改成真实包名，与 src/<package> 目录名一致；osv-scanner.toml 的 PackageOverrides 同改
 version = "0.1.0"
 # 只写下界不封上界：requires-python 同时约束可用语法与依赖解析范围
 requires-python = ">=3.12"

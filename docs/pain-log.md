@@ -26,6 +26,13 @@
 
 ## 已落地
 
+### 2026-11-06 〔调研引入〕可选池 OP1 安全双层（密钥扫描 + 依赖审计）
+
+- 现象：密钥泄漏与依赖漏洞，全库此前只有 principles 第 11 条一句 prose，没有任何机器兜底；调研可选池把它列为第一项（无前置、收益/成本比高）。
+- 归类：调研引入
+- 处置：[pre-write-secrets.sh](../claude-code/hooks/pre-write-secrets.sh)（写盘前）、[githooks/pre-commit](../claude-code/githooks/pre-commit)（提交前）、三栈 `configs/security-ci.yml`（gitleaks 全量 + 按栈依赖审计 + 每周 osv-scanner），python 另加 `configs/osv-scanner.toml`；与原方案的偏差见 [adoption-plan.md](research/adoption-plan.md) 第 7 节。
+- 状态：已落地；2026-11-20 按可选池规则看「用没用到」决定去留。principles 第 11 条已有工具兜底，列为修剪候选。
+
 ### 2026-11-05 〔调研引入〕外部调研批量引入预防性规则与配置
 
 - 现象：外部调研批量引入预防性规则与配置，并非单一被坑现场；无单条痛点可引，靠第二入口（见 [CLAUDE.md](../CLAUDE.md)）合法入库。

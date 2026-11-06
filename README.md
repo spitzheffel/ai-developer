@@ -44,21 +44,24 @@
 ├── claude-code/                   # Claude Code 本体配置
 │   ├── hooks.md                   # 钩子安装与说明
 │   ├── settings.json.example      # settings 示例
+│   ├── githooks/
+│   │   └── pre-commit             # git 提交前钩子：gitleaks 扫暂存改动
 │   └── hooks/
 │       ├── post-edit-format.sh    # 编辑后自动格式化
 │       ├── pre-edit-migrations.sh # 编辑前拦截迁移目录内的 Edit/Write
+│       ├── pre-write-secrets.sh   # 写盘前用 gitleaks 拦密钥
 │       └── stop-verify.sh         # 收尾前自动验证
 └── stacks/                        # 每栈一目录：README（固定七节）+ configs
     ├── _template.md               # 新栈起步骨架
     ├── typescript-react/
     │   ├── README.md
-    │   └── configs/               # eslint.config.js、tsconfig.json、.prettierrc.json、.prettierignore、.dependency-cruiser.cjs、contracts-ci.yml
+    │   └── configs/               # eslint.config.js、tsconfig.json、.prettierrc.json、.prettierignore、.dependency-cruiser.cjs、contracts-ci.yml、security-ci.yml
     ├── python/
     │   ├── README.md
-    │   └── configs/               # pyproject.toml、contracts-ci.yml
+    │   └── configs/               # pyproject.toml、osv-scanner.toml、contracts-ci.yml、security-ci.yml
     └── go/
         ├── README.md
-        └── configs/               # .golangci.yml、contracts-ci.yml
+        └── configs/               # .golangci.yml、contracts-ci.yml、security-ci.yml
 ```
 
 ## 快速开始
@@ -66,7 +69,7 @@
 在一个新项目里用起来，四步：
 
 1. 复制 [templates/CLAUDE.md.template](templates/CLAUDE.md.template) 到新项目根目录，按注释填空，模块地图必填。
-2. 复制对应栈的 `stacks/<栈>/configs/` 进项目，再按 [claude-code/hooks.md](claude-code/hooks.md) 安装钩子与 [settings](claude-code/settings.json.example)。
+2. 复制对应栈的 `stacks/<栈>/configs/` 进项目（其中 `security-ci.yml` 放到 `.github/workflows/security.yml`），再按 [claude-code/hooks.md](claude-code/hooks.md) 安装钩子与 [settings](claude-code/settings.json.example)。
 3. 让 Claude 在任务中遵循 process/ 的五步流程：[任务简述](process/task-brief.md) → [轮子vs自研](process/build-vs-buy.md) → [完成定义](process/definition-of-done.md) → [审查清单](process/review-checklist.md) → [会话管理](process/session-management.md)。
 4. 开始记 [docs/pain-log.md](docs/pain-log.md)：每次被 AI 坑，当场记一条。
 

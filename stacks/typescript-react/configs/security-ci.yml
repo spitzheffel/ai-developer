@@ -1,0 +1,67 @@
+# 安全门禁 CI 模板（TS/React 栈）：OP1「安全双层」的 CI 层。复制为项目的 .github/workflows/security.yml，标 <占位> 的行按项目改。
+# 两类风险，各两道关。本地层是两个钩子：Claude Code 的 pre-write-secrets.sh（写盘前）与 git 的 githooks/pre-commit（提交前），装法见 claude-code/hooks.md。
+#   secrets     每次 push / PR 用 gitleaks 扫全部历史：本地钩子可被 --no-verify 跳过、新机器可能没装，CI 这层绕不过去
+#   deps        每次 push / PR 跑 pnpm audit，high 及以上即红
+#   osv-weekly  每周一 osv-scanner 全量：新披露的漏洞不随代码变更出现，只靠 push / PR 会漏；OSV 还收录已知恶意包（MAL-）
+# 本栈特有两点：
+#   - 钉了 pnpm 12 的 pnpm-lock.yaml 是两段式，GitHub 依赖图读不出，Dependabot alerts 与恶意包告警都失明，osv-weekly 不可删。
+#   - 钉住的 pnpm 本身也会被 pnpm audit 与 osv-scanner 审计：package.json 的 packageManager 落后到有漏洞的版本，两道门一起红。
+# 遗留仓库先做 gitleaks baseline，只对新泄漏报红。生成和使用都必须带 --redact，否则旧发现全算新的，baseline 里还会留一份明文：
+#   git fetch --all --tags && gitleaks git . --redact --exit-code 0 --report-path .gitleaks-baseline.json   # 本地生成后提交
+#   然后在下面 secrets 的扫描命令末尾加 --baseline-path .gitleaks-baseline.json
+# 来源：docs/research/adoption-plan.md 可选池 OP1（2026-11 核实）。
+
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main] # <占位> 默认分支名
+  schedule:
+    - cron: "17 1 * * 1" # 每周一 01:17 UTC，避开整点高峰（整点会延迟甚至丢弃）；公开库 60 天无活动时 GitHub 会自动停用定时任务
+  workflow_dispatch: # 首次启用后手动跑一次，在 osv-weekly 日志里确认 pnpm-lock.yaml 被扫到（一个 lockfile 都没扫到也是绿的）
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    # 不用 gitleaks-action：它在 push / PR 上只扫新增提交、PR 只取前 30 个提交，默认下载旧版 8.24.3，组织账户还要 license
+    if: github.event_name != 'schedule' # 密钥只随提交进入，定时重扫没有新输入
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # 默认 1 只取触发提交；0 = 所有分支与 tag 的完整历史
+          persist-credentials: false
+      - name: 安装 gitleaks 8.30.1（校验 sha256）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+      - name: 全量历史扫描（exit 2 = 发现疑似密钥；exit 1 = 工具出错）
+        run: |
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner -v --exit-code 2
+
+  deps:
+    if: github.event_name != 'schedule' # 新披露的漏洞交给 osv-weekly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # 不写 version：读 package.json 的 packageManager
+      - name: pnpm audit（只读 pnpm-lock.yaml，不用 install；默认级别 low 太吵）
+        run: pnpm audit --audit-level high
+        # 忽略项写 pnpm-workspace.yaml 的 audit.ignore：只认 GHSA ID、没有过期机制，注释里写清理由与复查日
+
+  osv-weekly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions: # 三项必须显式给全：被调用的 reusable workflow 只能降权、不能升权
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0 # 没有 @v2 浮动 tag
+    with:
+      upload-sarif: false # 个人私有库必须 false：没有 code scanning，上传即失败；公开库可删此行，结果进 Security 页
+      # fail-on-vuln 默认 true：有漏洞即红；明细看 job 日志表格与 SARIF artifact。忽略项写 lockfile 同目录的 osv-scanner.toml

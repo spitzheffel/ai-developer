@@ -1,0 +1,17 @@
+# osv-scanner 配置（python 栈）：复制到 uv.lock 的同目录。它只作用于同目录的 lockfile，不向子目录传播。
+# 有未知键（比如字段拼错）时整个文件被忽略、CLI 退出码 130：改完先在本地跑一次 osv-scanner scan source -r . 确认。
+# 来源：docs/research/adoption-plan.md 可选池 OP1（2026-11 核实）；用法见 security-ci.yml 的 osv-weekly job。
+
+# 基线是打包项目（uv init --package），uv.lock 里的根包是 editable，osv-scanner 会拿本项目的名字去查 PyPI；
+# 占位名 example 在 PyPI 上真实存在，不排除就误报。
+[[PackageOverrides]]
+name = "example"   # 与 uv.lock 里根包的 name 一致：即 [project].name 规范化后（转小写，下划线变连字符）
+ecosystem = "PyPI" # 大小写敏感，必须精确写 PyPI
+ignore = true
+reason = "editable 根包是本项目自身，不是 PyPI 上的同名包"
+
+# 暂不修的漏洞：ignoreUntil 是 TOML 日期（不加引号），到期后自动恢复报警；忽略一个 ID 会连同它的别名一起忽略。
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2027-02-01
+# reason = "<暂不修的理由与复查日>"

@@ -116,7 +116,7 @@
 
 | # | 项 | 触发条件 | 来源 |
 |---|---|---|---|
-| OP1 | 安全双层：gitleaks pre-commit+CI 全量、uv audit / govulncheck、weekly osv-scanner | 无前置，收益/成本比高，建议最先从本池取用 | E-O5/B8 |
+| ✅ OP1 | 安全双层：gitleaks pre-commit+CI 全量、uv audit / govulncheck、weekly osv-scanner（2026-11-06 已引入，偏差见第 7 节；2026-11-20 按用没用到去留） | 无前置，收益/成本比高，建议最先从本池取用 | E-O5/B8 |
 | OP2 | CodeBoarding 进 CI（架构图增量刷新+PR 贴位置） | 想要「动态刷新代码地图」现成品时，先试一个仓库 | S-B1 |
 | OP3 | Chrome DevTools MCP（独立浏览器 profile） | TS/React 项目调前端 bug 频繁时 | S-B3 |
 | OP4 | OTel 最低限（只插桩 HTTP/DB/外呼）+ otel-desktop-viewer | 调性能/串流程时临时开 | S-B4 |
@@ -193,3 +193,16 @@
 | W8 | ✅ 提前写成 | 无 |
 
 〔试用〕复查日：**2027-05-05**。届时逐条看本批〔试用〕规则半年内是否在真实任务中用上：用上的去掉标记转正，没用上的删除，并在 [pain-log](../pain-log.md) 2026-11-05〔调研引入〕条目的处置里补一行去向。
+
+### 可选池 OP1（2026-11-06 引入）
+
+按用户指令提前取用可选池第一项。动手前分四条工具线核实了 109 条事实：99 条成立，9 条被推翻并已改正，1 条无法核实。`uv audit` 与 `pnpm audit` 在真实漏洞库上实跑过；gitleaks 与 osv-scanner 二进制未实跑（执行下载的程序被会话安全策略拦下），其行为来自读源码。落点：`claude-code/hooks/pre-write-secrets.sh`、`claude-code/githooks/pre-commit`、三栈 `configs/security-ci.yml`、python `configs/osv-scanner.toml`。与 OP1 及 ecosystem.md B8 原文的偏差：
+
+- 本地层由一道变两道：git 提交前钩子之外，另加 Claude Code 写盘前钩子，AI 写文件时当场拦。
+- gitleaks 已于 2026-05-21 冻结功能，只出安全补丁，默认规则停在 2025-11；后继 Betterleaks v1.x 与它兼容，v2 去掉了 baseline 与 `--staged`。暂用 gitleaks v8.30.1，Betterleaks v2 正式发布后再评估迁移。
+- 「CI 全量」不用 gitleaks-action：它在 push / PR 上只扫新增提交、PR 只取前 30 个提交；改为直接跑校验过 sha256 的命令行。
+- uv audit：门禁至少要 0.11.2（此前有漏洞也返回 0），「锁检查与审计分两步」的写法要 ≥0.12.14，至今仍是 preview，模板钉 0.13.7。「比 pip-audit 快一个量级」找不到针对 uv audit 的独立实测，应为「快数倍」。
+- 「遗留仓库先 baseline」只适用于 gitleaks 与 osv-scanner；govulncheck 没有任何忽略或 baseline 机制。
+- weekly osv-scanner 默认不扫 Go 标准库，所以 govulncheck 也挂每周定时。
+- 补上原文缺的 TS 按 PR 审计：`pnpm audit --audit-level high`。
+- 个人私有库：osv-scanner 的 SARIF 上传必然失败，模板设 `upload-sarif: false`；GitHub 对个人私有库没有原生密钥扫描，CI 层是唯一的服务器端兜底。

@@ -1,0 +1,74 @@
+# 安全门禁 CI 模板（python 栈）：OP1「安全双层」的 CI 层。复制为项目的 .github/workflows/security.yml，标 <占位> 的行按项目改。
+# 两类风险，各两道关。本地层是两个钩子：Claude Code 的 pre-write-secrets.sh（写盘前）与 git 的 githooks/pre-commit（提交前），装法见 claude-code/hooks.md。
+#   secrets     每次 push / PR 用 gitleaks 扫全部历史：本地钩子可被 --no-verify 跳过、新机器可能没装，CI 这层绕不过去
+#   deps        每次 push / PR：先 uv lock --check，再 uv audit（读 uv.lock 查 OSV，默认连 dev 组一起审计）
+#   osv-weekly  每周一 osv-scanner 全量：新披露的漏洞不随代码变更出现，只靠 push / PR 会漏；OSV 还收录已知恶意包（MAL-）
+# uv audit 至今仍是 preview：CI 必须钉 uv 版本。≥0.12.14 起「锁过期」与「有漏洞」都是 exit 1，所以拆成两步分开报。
+# 忽略漏洞：deps 用 pyproject 的 [tool.uv.audit] ignore = ["GHSA-..."]（ID 区分大小写，没有理由与到期字段，注释里写清）；
+#   osv-weekly 用 uv.lock 同目录 osv-scanner.toml 的 [[IgnoredVulns]]（ignoreUntil 到期后自动恢复报警）。
+# osv-scanner 会拿 editable 根包（本项目自身）去查 PyPI：把本栈 configs/osv-scanner.toml 复制到 uv.lock 同目录并改包名，否则同名即误报。
+# 修间接依赖的漏洞用 uv lock --upgrade-package <包名>：只升直接依赖时，uv lock 会保留仍满足约束的旧间接依赖。
+# Python 项目不在仓库根时：deps job 加 defaults.run.working-directory，setup-uv 加 with.working-directory。
+# 遗留仓库先做 gitleaks baseline，只对新泄漏报红。生成和使用都必须带 --redact，否则旧发现全算新的，baseline 里还会留一份明文：
+#   git fetch --all --tags && gitleaks git . --redact --exit-code 0 --report-path .gitleaks-baseline.json   # 本地生成后提交
+#   然后在下面 secrets 的扫描命令末尾加 --baseline-path .gitleaks-baseline.json
+# 来源：docs/research/adoption-plan.md 可选池 OP1（2026-11 核实）。
+
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main] # <占位> 默认分支名
+  schedule:
+    - cron: "17 1 * * 1" # 每周一 01:17 UTC，避开整点高峰（整点会延迟甚至丢弃）；公开库 60 天无活动时 GitHub 会自动停用定时任务
+  workflow_dispatch: # 首次启用后手动跑一次，在 osv-weekly 日志里确认 uv.lock 被扫到（一个 lockfile 都没扫到也是绿的）
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    # 不用 gitleaks-action：它在 push / PR 上只扫新增提交、PR 只取前 30 个提交，默认下载旧版 8.24.3，组织账户还要 license
+    if: github.event_name != 'schedule' # 密钥只随提交进入，定时重扫没有新输入
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # 默认 1 只取触发提交；0 = 所有分支与 tag 的完整历史
+          persist-credentials: false
+      - name: 安装 gitleaks 8.30.1（校验 sha256）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+      - name: 全量历史扫描（exit 2 = 发现疑似密钥；exit 1 = 工具出错）
+        run: |
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner -v --exit-code 2
+
+  deps:
+    if: github.event_name != 'schedule' # 新披露的漏洞交给 osv-weekly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3 # setup-uv 从 v8 起不再发布浮动大版本 tag，没有 @v10
+        with:
+          version: "0.13.7" # 必须钉死：audit 仍是 preview，行为随版本变；升级前读 CHANGELOG 的 Preview features
+          enable-cache: false # 审计不装包，缓存没有收益
+      - name: 锁文件与 pyproject 一致（不一致即红，与漏洞分开报）
+        run: uv lock --check
+      - name: uv audit（有漏洞 exit 1；网络或内部错误 exit 2）
+        run: uv audit --frozen --preview-features audit-command
+
+  osv-weekly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions: # 三项必须显式给全：被调用的 reusable workflow 只能降权、不能升权
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0 # 没有 @v2 浮动 tag
+    with:
+      upload-sarif: false # 个人私有库必须 false：没有 code scanning，上传即失败；公开库可删此行，结果进 Security 页
+      # fail-on-vuln 默认 true：有漏洞即红；明细看 job 日志表格与 SARIF artifact

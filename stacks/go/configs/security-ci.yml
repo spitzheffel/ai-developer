@@ -1,0 +1,75 @@
+# 安全门禁 CI 模板（Go 栈）：OP1「安全双层」的 CI 层。复制为项目的 .github/workflows/security.yml，标 <占位> 的行按项目改。
+# 两类风险，各两道关。本地层是两个钩子：Claude Code 的 pre-write-secrets.sh（写盘前）与 git 的 githooks/pre-commit（提交前），装法见 claude-code/hooks.md。
+#   secrets     每次 push / PR 用 gitleaks 扫全部历史：本地钩子可被 --no-verify 跳过、新机器可能没装，CI 这层绕不过去
+#   deps        每次 push / PR，以及每周一：govulncheck 只对「代码真调用到的漏洞符号」报红（exit 3），噪声低；
+#               每周也跑它，因为 osv-scanner 默认不扫 Go 标准库（单设 GoVersionOverride 也恢复不了），新披露的标准库漏洞只能靠这里
+#   osv-weekly  每周一 osv-scanner 全量：新披露的漏洞不随代码变更出现，只靠 push / PR 会漏；OSV 还收录已知恶意包（MAL-）
+# 标准库漏洞按 CI 里 PATH 上那个 go 判定，不按 go.mod 的 go 行，所以 CI 的 Go 必须等于构建发布用的 Go：
+#   - 应用项目在 go.mod 写 toolchain 行（例：toolchain go1.27.3，go.mod 的注释只能用 //），setup-go 优先读它；
+#     只有 go 1.26.0 这类旧补丁、没有 toolchain 行时，按 2026-11 的漏洞库标准库就有 47 条漏洞，门禁大概率直接红。
+#   - 库项目（go 行只是最低兼容版本）把 setup-go 的 go-version-file 换成 go-version: stable。
+# govulncheck v1.9.0 要求 Go ≥ 1.26：1.24、1.25 已出支持期，先升级工具链。
+# govulncheck 没有任何忽略或 baseline 机制：被调用到的漏洞只能升级修掉；不要用 go run 跑它，go run 会把退出码 3 吞成 1。
+# Go 模块不在仓库根时：go-version-file 写子目录路径，deps job 加 defaults.run.working-directory。
+# 依赖私有 Go 模块时：deps job 的 env 加 GOPRIVATE，并用只读 token 配 git insteadOf，否则加载包失败，exit 1。
+# 遗留仓库先做 gitleaks baseline，只对新泄漏报红。生成和使用都必须带 --redact，否则旧发现全算新的，baseline 里还会留一份明文：
+#   git fetch --all --tags && gitleaks git . --redact --exit-code 0 --report-path .gitleaks-baseline.json   # 本地生成后提交
+#   然后在下面 secrets 的扫描命令末尾加 --baseline-path .gitleaks-baseline.json
+# 来源：docs/research/adoption-plan.md 可选池 OP1（2026-11 核实）。
+
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main] # <占位> 默认分支名
+  schedule:
+    - cron: "17 1 * * 1" # 每周一 01:17 UTC，避开整点高峰（整点会延迟甚至丢弃）；公开库 60 天无活动时 GitHub 会自动停用定时任务
+  workflow_dispatch: # 首次启用后手动跑一次，在 osv-weekly 日志里确认 go.mod 被扫到（一个 lockfile 都没扫到也是绿的）
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    # 不用 gitleaks-action：它在 push / PR 上只扫新增提交、PR 只取前 30 个提交，默认下载旧版 8.24.3，组织账户还要 license
+    if: github.event_name != 'schedule' # 密钥只随提交进入，定时重扫没有新输入
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # 默认 1 只取触发提交；0 = 所有分支与 tag 的完整历史
+          persist-credentials: false
+      - name: 安装 gitleaks 8.30.1（校验 sha256）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+      - name: 全量历史扫描（exit 2 = 发现疑似密钥；exit 1 = 工具出错）
+        run: |
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner -v --exit-code 2
+
+  deps:
+    runs-on: ubuntu-latest # 不设 if：push / PR 和每周定时都跑
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod # toolchain 行优先，没有才用 go 行；带补丁号就精确安装那个补丁
+      - name: govulncheck（exit 3 = 代码调用到了有漏洞的符号）
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          govulncheck -show version ./...
+
+  osv-weekly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions: # 三项必须显式给全：被调用的 reusable workflow 只能降权、不能升权
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0 # 没有 @v2 浮动 tag
+    with:
+      upload-sarif: false # 个人私有库必须 false：没有 code scanning，上传即失败；公开库可删此行，结果进 Security 页
+      # fail-on-vuln 默认 true：有漏洞即红；明细看 job 日志表格与 SARIF artifact。忽略项写 go.mod 同目录的 osv-scanner.toml

@@ -21,6 +21,7 @@
 | 集成测试 | testcontainers-go 起真库/缓存,核心用户路径必有穿真库的测试 | go-sqlmock 等 mock DB | mock 只留给外部付费/不可控服务（〔试用〕来源：调研 2026-11，[docs/research/adoption-plan.md](../../docs/research/adoption-plan.md)） |
 | Lint | golangci-lint(配置见 [configs/.golangci.yml](configs/.golangci.yml)) | — | — |
 | 依赖边界 | `internal/`(编译器强制)+ depguard 按 import 前缀禁跨域(规则见 [configs/.golangci.yml](configs/.golangci.yml)) | — | 越界即 CI 红灯,AI 看到红自己修（〔试用〕来源：调研 2026-11，[docs/research/adoption-plan.md](../../docs/research/adoption-plan.md)） |
+| 依赖审计 | govulncheck 当 PR 门禁兼每周定时 + 每周 osv-scanner 全量(见 [configs/security-ci.yml](configs/security-ci.yml));CI 的 Go 取 go.mod 的 toolchain 行 | 指望 golangci-lint/gosec 查依赖漏洞 | 只报代码真调用到的漏洞,噪声低;golangci-lint 不含它,osv-scanner 默认不扫标准库（〔试用〕来源：调研 2026-11，[docs/research/adoption-plan.md](../../docs/research/adoption-plan.md) OP1） |
 | Format | gofmt/goimports;配置里以 gofumpt(gofmt 严格超集)+ goimports 落地 | 手调风格 | 风格争论全由 formatter 终结 |
 
 ## 2. 工具链与命令
@@ -33,6 +34,7 @@
 | Lint | `golangci-lint run`;自动修复 `golangci-lint run --fix` |
 | 格式化 | `golangci-lint fmt`(驱动 gofumpt+goimports;`run` 对格式只报不改) |
 | 依赖整理 | `go mod tidy`——增删 import 后必跑,否则 go.mod/go.sum 脏 |
+| 依赖审计 | `govulncheck ./...`(先 `go install golang.org/x/vuln/cmd/govulncheck@v1.9.0`,要求 Go ≥ 1.26;exit 3 = 代码调用到了有漏洞的符号) |
 
 改完代码的验证顺序:`go build ./...` → `go test ./...` → `golangci-lint run`,全绿才算过[完成定义](../../process/definition-of-done.md)。
 
@@ -182,5 +184,6 @@ func TestFind(t *testing.T) {
 |---|---|---|
 | [configs/.golangci.yml](configs/.golangci.yml) | golangci-lint v2:standard 组(errcheck/govet/ineffassign/staticcheck/unused)+ gocritic/revive/misspell + depguard(依赖边界示例规则);formatters 用 gofumpt+goimports | 复制到项目根 → `golangci-lint run` / `run --fix`;depguard 规则按自己的业务域改名 |
 | [configs/contracts-ci.yml](configs/contracts-ci.yml) | GitHub Actions 契约门禁:tbls diff 卡 `dbdoc/` 漂移;再生成的 `api/openapi.json` 未提交即 fail + oasdiff `fail-on: ERR` + Spectral lint;proto 项目换 buf breaking | 下一个真实 API 项目开工时复制到 `.github/workflows/`,按文件头注释删掉用不到的 job |
+| [configs/security-ci.yml](configs/security-ci.yml) | 安全门禁:gitleaks 每次扫全部历史;govulncheck 卡 PR 兼每周定时(osv-scanner 默认不扫标准库);每周 osv-scanner 全量 | 直接启用:复制为 `.github/workflows/security.yml`;本地两个钩子见 [claude-code/hooks.md](../../claude-code/hooks.md) |
 
 `go.mod`/`go.sum` 由 `go mod init` 与 `go mod tidy` 生成维护,不提供模板。保存后自动格式化、停止前跑验证的钩子接法见 [claude-code/hooks.md](../../claude-code/hooks.md)。
